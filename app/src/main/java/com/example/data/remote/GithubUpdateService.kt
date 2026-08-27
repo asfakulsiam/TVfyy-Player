@@ -22,39 +22,61 @@ class GithubUpdateService(
         currentVersionName: String
     ): Result<UpdateInfo> = withContext(Dispatchers.IO) {
         try {
-            val url = "https://api.github.com/repos/${owner.trim()}/${repo.trim()}/releases/latest"
-            val request = Request.Builder()
-                .url(url)
+            val cleanOwner = owner.trim()
+            val cleanRepo = repo.trim()
+            var json: JSONObject? = null
+
+            // 1. Try fetching latest release
+            val latestUrl = "https://api.github.com/repos/$cleanOwner/$cleanRepo/releases/latest"
+            val latestRequest = Request.Builder()
+                .url(latestUrl)
                 .addHeader("Accept", "application/vnd.github.v3+json")
                 .addHeader("User-Agent", "TVfyy-Player-Android-App")
                 .build()
 
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                if (response.code == 404) {
-                    return@withContext Result.failure(
-                        Exception("Repository or release not found for $owner/$repo. Please ensure the repository is public and has a release.")
-                    )
+            val latestResponse = client.newCall(latestRequest).execute()
+            if (latestResponse.isSuccessful) {
+                val body = latestResponse.body?.string()
+                if (!body.isNullOrBlank()) {
+                    json = JSONObject(body)
                 }
-                if (response.code == 403) {
-                    return@withContext Result.failure(
-                        Exception("GitHub API rate limit exceeded. Please try again later.")
-                    )
-                }
+            } else if (latestResponse.code == 403) {
                 return@withContext Result.failure(
-                    Exception("Failed to check for updates (HTTP ${response.code})")
+                    Exception("GitHub API rate limit exceeded. Please try again later.")
                 )
             }
 
-            val bodyString = response.body?.string() ?: return@withContext Result.failure(
-                Exception("Empty response from GitHub API")
-            )
+            // 2. Fallback to /releases list if /releases/latest was 404 or empty
+            if (json == null) {
+                val listUrl = "https://api.github.com/repos/$cleanOwner/$cleanRepo/releases?per_page=1"
+                val listRequest = Request.Builder()
+                    .url(listUrl)
+                    .addHeader("Accept", "application/vnd.github.v3+json")
+                    .addHeader("User-Agent", "TVfyy-Player-Android-App")
+                    .build()
 
-            val json = JSONObject(bodyString)
-            val tagName = json.optString("tag_name", "")
-            val title = json.optString("name", tagName)
-            val releaseNotes = json.optString("body", "No release notes provided.")
-            val htmlUrl = json.optString("html_url", "https://github.com/$owner/$repo/releases")
+                val listResponse = client.newCall(listRequest).execute()
+                if (listResponse.isSuccessful) {
+                    val listBody = listResponse.body?.string()
+                    if (!listBody.isNullOrBlank()) {
+                        val arr = org.json.JSONArray(listBody)
+                        if (arr.length() > 0) {
+                            json = arr.getJSONObject(0)
+                        }
+                    }
+                }
+            }
+
+            if (json == null) {
+                return@withContext Result.failure(
+                    Exception("No releases found on GitHub for $cleanOwner/$cleanRepo.")
+                )
+            }
+
+            val tagName = json.optString("tag_name", "").trim()
+            val title = json.optString("name", tagName).trim()
+            val releaseNotes = json.optString("body", "Performance improvements and bug fixes.")
+            val htmlUrl = json.optString("html_url", "https://github.com/$cleanOwner/$cleanRepo/releases")
             val publishedAt = json.optString("published_at", "")
 
             var downloadUrl = htmlUrl
@@ -62,7 +84,6 @@ class GithubUpdateService(
 
             val assetsArray = json.optJSONArray("assets")
             if (assetsArray != null && assetsArray.length() > 0) {
-                // Find apk asset first, or fallback to first asset
                 for (i in 0 until assetsArray.length()) {
                     val asset = assetsArray.getJSONObject(i)
                     val assetName = asset.optString("name", "")
@@ -73,7 +94,7 @@ class GithubUpdateService(
                         downloadUrl = assetUrl
                         if (sizeBytes > 0) {
                             val sizeMb = sizeBytes / (1024.0 * 1024.0)
-                            assetSizeFormatted = String.format("%.1f MB", sizeMb)
+                            assetSizeFormatted = String.format(java.util.Locale.US, "%.1f MB", sizeMb)
                         }
                         if (assetName.endsWith(".apk", ignoreCase = true)) {
                             break
@@ -82,12 +103,20 @@ class GithubUpdateService(
                 }
             }
 
-            val isUpdateAvailable = isRemoteVersionNewer(currentVersionName, tagName)
+            // Detect remote version across tag name, release title, and changelog headers
+            val isUpdateAvailable = isRemoteVersionNewer(
+                currentVersion = currentVersionName,
+                remoteTag = tagName,
+                remoteTitle = title,
+                releaseNotes = releaseNotes
+            )
+
+            val displayVersion = resolveDisplayVersion(tagName, title, releaseNotes)
 
             val updateInfo = UpdateInfo(
                 currentVersion = currentVersionName,
-                latestVersion = tagName,
-                releaseTitle = if (title.isBlank()) "TVfyy Player $tagName" else title,
+                latestVersion = displayVersion,
+                releaseTitle = if (title.isBlank()) "TVfyy Player $displayVersion" else title,
                 releaseNotes = releaseNotes,
                 htmlUrl = htmlUrl,
                 downloadUrl = downloadUrl,
@@ -103,30 +132,71 @@ class GithubUpdateService(
     }
 
     /**
-     * Compare semantic version strings (e.g. "1.0", "v1.2.0", "1.2.1-beta")
+     * Resolve the most accurate version tag to show to the user
      */
-    fun isRemoteVersionNewer(currentVersion: String, remoteTag: String): Boolean {
+    fun resolveDisplayVersion(tag: String, title: String, notes: String): String {
+        if (tag.isNotBlank()) return tag
+        val titleMatch = Regex("""v?(\d+\.\d+(?:\.\d+)?)""").find(title)
+        if (titleMatch != null) return "v${titleMatch.groupValues[1]}"
+        val notesMatch = Regex("""\[(\d+\.\d+(?:\.\d+)?)\]""").find(notes)
+        if (notesMatch != null) return "v${notesMatch.groupValues[1]}"
+        return tag.ifBlank { "Latest" }
+    }
+
+    /**
+     * Compare semantic version strings across candidate sources
+     */
+    fun isRemoteVersionNewer(
+        currentVersion: String,
+        remoteTag: String,
+        remoteTitle: String = "",
+        releaseNotes: String = ""
+    ): Boolean {
         try {
-            val cleanCurrent = currentVersion.trim().removePrefix("v").removePrefix("V")
-            val cleanRemote = remoteTag.trim().removePrefix("v").removePrefix("V")
+            val currParts = parseVersionParts(currentVersion)
+            if (currParts.isEmpty()) return false
 
-            if (cleanCurrent.equals(cleanRemote, ignoreCase = true)) {
-                return false
+            val candidateStrings = listOf(remoteTag, remoteTitle, releaseNotes.take(150))
+            var bestRemoteParts: List<Int> = emptyList()
+
+            for (candidate in candidateStrings) {
+                val parts = parseVersionParts(candidate)
+                if (parts.isNotEmpty()) {
+                    if (bestRemoteParts.isEmpty() || isPartsGreater(parts, bestRemoteParts)) {
+                        bestRemoteParts = parts
+                    }
+                }
             }
 
-            val currentParts = cleanCurrent.split(".", "-").mapNotNull { it.toIntOrNull() }
-            val remoteParts = cleanRemote.split(".", "-").mapNotNull { it.toIntOrNull() }
-
-            val maxLen = maxOf(currentParts.size, remoteParts.size)
-            for (i in 0 until maxLen) {
-                val curr = currentParts.getOrElse(i) { 0 }
-                val rem = remoteParts.getOrElse(i) { 0 }
-                if (rem > curr) return true
-                if (rem < curr) return false
+            if (bestRemoteParts.isEmpty()) {
+                return remoteTag.isNotBlank() && !remoteTag.equals(currentVersion, ignoreCase = true)
             }
-            return false
+
+            return isPartsGreater(bestRemoteParts, currParts)
         } catch (_: Exception) {
             return remoteTag.isNotBlank() && !remoteTag.equals(currentVersion, ignoreCase = true)
         }
+    }
+
+    private fun parseVersionParts(text: String): List<Int> {
+        if (text.isBlank()) return emptyList()
+        val regex = Regex("""(\d+(?:\.\d+)+)""")
+        val match = regex.find(text)
+        if (match != null) {
+            return match.groupValues[1].split(".").mapNotNull { it.toIntOrNull() }
+        }
+        val nums = Regex("""\d+""").findAll(text).mapNotNull { it.value.toIntOrNull() }.toList()
+        return nums
+    }
+
+    private fun isPartsGreater(a: List<Int>, b: List<Int>): Boolean {
+        val maxLen = maxOf(a.size, b.size)
+        for (i in 0 until maxLen) {
+            val partA = a.getOrElse(i) { 0 }
+            val partB = b.getOrElse(i) { 0 }
+            if (partA > partB) return true
+            if (partA < partB) return false
+        }
+        return false
     }
 }

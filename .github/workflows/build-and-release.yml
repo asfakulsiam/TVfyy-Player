@@ -172,10 +172,19 @@ jobs:
           cat release_dist/SHA256SUMS.txt >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
-      - name: Extract Release Notes from CHANGELOG
+      - name: Extract Version and Release Notes from CHANGELOG
+        id: release_meta
         run: |
           python3 - << 'EOF'
           import os, re
+
+          version = "1.1.3"
+          if os.path.exists("app/build.gradle.kts"):
+              with open("app/build.gradle.kts", "r", encoding="utf-8") as f:
+                  g_content = f.read()
+              m_v = re.search(r'computedVersionName\s*=\s*.*?else\s*"([^"]+)"', g_content)
+              if m_v:
+                  version = m_v.group(1).strip()
 
           notes = ""
           if os.path.exists("CHANGELOG.md"):
@@ -188,11 +197,17 @@ jobs:
                   notes = match.group(1).strip()
 
           if not notes:
-              notes = "### What's New in TVfyy Player\n- Automatic release build with performance improvements and bug fixes."
+              notes = f"### What's New in TVfyy Player v{version}\n- Automatic release build with performance improvements and bug fixes."
 
           with open("RELEASE_NOTES.md", "w", encoding="utf-8") as f:
               f.write(notes + "\n")
 
+          github_output = os.environ.get("GITHUB_OUTPUT")
+          if github_output:
+              with open(github_output, "a", encoding="utf-8") as f:
+                  f.write(f"version={version}\n")
+
+          print(f"Generated release version: {version}")
           print("Generated RELEASE_NOTES.md for GitHub Release:")
           print(notes)
           EOF
@@ -208,8 +223,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event.inputs.create_release == 'true' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
-          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('TVfyy Player {0}', github.ref_name) || format('TVfyy Player v1.0.{0}', github.run_number) }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.release_meta.outputs.version || '1.1.3') }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('TVfyy Player {0}', github.ref_name) || format('TVfyy Player v{0}', steps.release_meta.outputs.version || '1.1.3') }}
           body_path: RELEASE_NOTES.md
           files: |
             release_dist/*.apk

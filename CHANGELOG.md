@@ -4,6 +4,16 @@ All notable changes to the **TVfyy Player** project are documented in this file.
 
 ---
 
+## [1.1.3] - 2026-08-27
+
+### Fixed
+- **In-App Auto-Updater Detection**: Resolved update detection failure caused by tag/release version discrepancy (`v1.0.10` vs `1.1.2`).
+- **Semantic Version Intelligence**: Enhanced remote version parser to extract and compare semantic versions across GitHub release tags, titles, and changelog headers (`tag_name`, `name`, `body`).
+- **CI/CD GitHub Release Tag Alignment**: Updated `.github/workflows/build-and-release.yml` to automatically extract the real version name from Gradle and tag GitHub releases with the exact version (e.g. `v1.1.3`).
+- **Auto-Popup Display on App Launch**: Ensured that the update popup dialog appears immediately after splash screen completion whenever an update is available.
+
+---
+
 ## [1.1.2] - 2026-08-27
 
 ### Added
