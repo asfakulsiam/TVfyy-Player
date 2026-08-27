@@ -46,6 +46,8 @@ android {
       val targetStoreFile = when {
         !envKeystorePath.isNullOrBlank() && file(envKeystorePath).exists() -> file(envKeystorePath)
         !envKeystorePath.isNullOrBlank() && rootProject.file(envKeystorePath).exists() -> rootProject.file(envKeystorePath)
+        file("tvfyy-player-release.jks").exists() -> file("tvfyy-player-release.jks")
+        rootProject.file("tvfyy-player-release.jks").exists() -> rootProject.file("tvfyy-player-release.jks")
         file("release.keystore").exists() -> file("release.keystore")
         file("release.jks").exists() -> file("release.jks")
         rootProject.file("release.keystore").exists() -> rootProject.file("release.keystore")

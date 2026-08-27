@@ -24,8 +24,10 @@ local.properties
 # Keystores & Signing
 debug.keystore
 debug.keystore.base64
+release_keystore.base64
 *.jks
 *.keystore
+*.base64
 
 # Android Studio / OS files
 /captures/
