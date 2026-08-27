@@ -172,6 +172,31 @@ jobs:
           cat release_dist/SHA256SUMS.txt >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
+      - name: Extract Release Notes from CHANGELOG
+        run: |
+          python3 - << 'EOF'
+          import os, re
+
+          notes = ""
+          if os.path.exists("CHANGELOG.md"):
+              with open("CHANGELOG.md", "r", encoding="utf-8") as f:
+                  content = f.read()
+              
+              # Extract the latest version section (between the first ## [version] and next ## [version] or EOF)
+              match = re.search(r'(##\s*\[.*?\][^\n]*\n(?:.|\n)*?)(?=\n##\s*\[|\Z)', content)
+              if match:
+                  notes = match.group(1).strip()
+
+          if not notes:
+              notes = "### What's New in TVfyy Player\n- Automatic release build with performance improvements and bug fixes."
+
+          with open("RELEASE_NOTES.md", "w", encoding="utf-8") as f:
+              f.write(notes + "\n")
+
+          print("Generated RELEASE_NOTES.md for GitHub Release:")
+          print(notes)
+          EOF
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -185,11 +210,11 @@ jobs:
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
           name: ${{ startsWith(github.ref, 'refs/tags/v') && format('TVfyy Player {0}', github.ref_name) || format('TVfyy Player v1.0.{0}', github.run_number) }}
+          body_path: RELEASE_NOTES.md
           files: |
             release_dist/*.apk
             release_dist/*.aab
             release_dist/SHA256SUMS.txt
-          generate_release_notes: true
           draft: false
           prerelease: false
         env:

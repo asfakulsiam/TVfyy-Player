@@ -240,8 +240,6 @@ fun AppNavigation(
                             onNavigateToSupport = { isSupportOpen = true },
                             onCheckForUpdates = { updateViewModel.checkForUpdates(isUserInitiated = true) },
                             updateState = updateState,
-                            connectedRepo = updateViewModel.getConnectedRepo(),
-                            onUpdateRepo = { owner, repo -> updateViewModel.updateConnectedRepo(owner, repo) },
                             autoCheckUpdates = updateViewModel.isAutoCheckEnabled(),
                             onToggleAutoCheckUpdates = { updateViewModel.setAutoCheckEnabled(it) }
                         )

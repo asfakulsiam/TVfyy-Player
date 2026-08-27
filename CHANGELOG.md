@@ -4,6 +4,17 @@ All notable changes to the **TVfyy Player** project are documented in this file.
 
 ---
 
+## [1.1.2] - 2026-08-27
+
+### Added
+- **Automated GitHub Release Notes Publishing**: CI/CD pipeline now automatically extracts and formats the full "What's New" release notes from `CHANGELOG.md` directly onto the GitHub Releases page, ensuring clean release notes without cluttering Git commit messages.
+- **Direct In-App Release Notes Integration**: In-app updater dynamically pulls release notes directly from GitHub Releases to show users a changelog popup when an update is available.
+
+### Changed
+- **Streamlined Settings UI**: Removed the manual "Connected Repository" configuration UI. Repository tracking is now seamlessly pre-configured to `asfakulsiam/TVfyy-Player` with dynamic launch-time auto-checking and manual check triggers.
+
+---
+
 ## [1.1.1] - 2026-08-27
 
 ### Added

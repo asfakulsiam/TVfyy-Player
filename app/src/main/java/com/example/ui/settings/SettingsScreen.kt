@@ -68,14 +68,8 @@ import com.example.subtitles.SubtitleManager
 import com.example.ui.theme.CyanPrimary
 
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.TextButton
 import com.example.BuildConfig
 import com.example.domain.model.UpdateCheckState
 import com.example.ui.components.TvFyyLogo
@@ -86,17 +80,12 @@ fun SettingsScreen(
     onNavigateToSupport: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     updateState: UpdateCheckState? = null,
-    connectedRepo: Pair<String, String> = Pair("asfakulsiam", "TVfyy-Player"),
-    onUpdateRepo: (String, String) -> Unit = { _, _ -> },
     autoCheckUpdates: Boolean = true,
     onToggleAutoCheckUpdates: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val subtitleManager = remember { SubtitleManager(context) }
-    var showRepoDialog by remember { mutableStateOf(false) }
-    var repoOwnerInput by remember { mutableStateOf(connectedRepo.first) }
-    var repoNameInput by remember { mutableStateOf(connectedRepo.second) }
 
     var hardwareAcceleration by remember { mutableStateOf(true) }
     var autoPipEnabled by remember { mutableStateOf(true) }
@@ -534,7 +523,7 @@ fun SettingsScreen(
         // GitHub Releases & Auto-Updater Section
         item {
             Spacer(modifier = Modifier.height(20.dp))
-            SettingsCategoryHeader(title = "App Updates & GitHub Releases")
+            SettingsCategoryHeader(title = "App Updates")
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(16.dp),
@@ -543,56 +532,6 @@ fun SettingsScreen(
                     .testTag("settings_updates_card")
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    // Connected Repository Info
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Icon(
-                                imageVector = Icons.Default.NewReleases,
-                                contentDescription = null,
-                                tint = CyanPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "Connected Repository",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "${connectedRepo.first}/${connectedRepo.second}",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        IconButton(
-                            onClick = {
-                                repoOwnerInput = connectedRepo.first
-                                repoNameInput = connectedRepo.second
-                                showRepoDialog = true
-                            },
-                            modifier = Modifier.testTag("settings_edit_repo_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Change Repository",
-                                tint = CyanPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(
-                        color = DividerDefaults.color.copy(alpha = 0.2f),
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-
                     // Auto-Check Toggle
                     SettingToggleRow(
                         title = "Auto-Check on Startup",
@@ -709,58 +648,6 @@ fun SettingsScreen(
                 }
             }
         }
-    }
-
-    if (showRepoDialog) {
-        AlertDialog(
-            onDismissRequest = { showRepoDialog = false },
-            title = {
-                Text(text = "Connect GitHub Repository", fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "Enter the GitHub repository owner and name for checking updates and releases:",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = repoOwnerInput,
-                        onValueChange = { repoOwnerInput = it },
-                        label = { Text("Repository Owner / Organization") },
-                        placeholder = { Text("asfakulsiam") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = repoNameInput,
-                        onValueChange = { repoNameInput = it },
-                        label = { Text("Repository Name") },
-                        placeholder = { Text("TVfyy-Player") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onUpdateRepo(repoOwnerInput.trim(), repoNameInput.trim())
-                        showRepoDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary)
-                ) {
-                    Text(text = "Save", color = Color(0xFF00363D), fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRepoDialog = false }) {
-                    Text(text = "Cancel")
-                }
-            }
-        )
     }
 }
 
