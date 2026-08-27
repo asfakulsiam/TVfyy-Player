@@ -41,10 +41,10 @@ jobs:
           java-version: '21'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: wrapper
-          cache-disabled: false
+          cache-disabled: true
 
       - name: Prepare Signing Keystore
         id: prepare_keystore
@@ -54,31 +54,61 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Decoding production release keystore from GitHub Secrets..."
-            mkdir -p app
-            # Cleanly decode base64 into app/tvfyy-player-release.jks ignoring any potential whitespace or trailing newlines
-            echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > app/tvfyy-player-release.jks 2>/dev/null || \
-            echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > app/tvfyy-player-release.jks
+          python3 - << 'EOF'
+          import os, sys, base64, subprocess
 
-            # Validate decoded keystore file exists and is not empty
-            if [ ! -s app/tvfyy-player-release.jks ]; then
-              echo "::error::Decoded keystore file is empty or corrupted. Please verify the KEYSTORE_BASE64 GitHub Secret."
-              exit 1
-            fi
+          b64_val = os.environ.get("KEYSTORE_BASE64", "").strip()
+          store_pass = os.environ.get("KEYSTORE_PASSWORD", "")
+          key_alias = os.environ.get("KEY_ALIAS", "")
+          key_pass = os.environ.get("KEY_PASSWORD", "")
 
-            KS_SIZE=$(wc -c < app/tvfyy-player-release.jks)
-            echo "Keystore successfully decoded ($KS_SIZE bytes)."
+          if not b64_val:
+              print("::warning::No KEYSTORE_BASE64 secret found. Falling back to debug keystore for CI.")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("has_keystore=false\n")
+              sys.exit(0)
 
-            echo "KEYSTORE_PATH=${{ github.workspace }}/app/tvfyy-player-release.jks" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
-            echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
-            echo "has_keystore=true" >> $GITHUB_OUTPUT
-          else
-            echo "::warning::No KEYSTORE_BASE64 secret found. Falling back to temporary debug keystore for CI verification."
-            echo "has_keystore=false" >> $GITHUB_OUTPUT
-          fi
+          os.makedirs("app", exist_ok=True)
+          clean_b64 = "".join(b64_val.split())
+          pad_rem = len(clean_b64) % 4
+          if pad_rem:
+              clean_b64 += "=" * (4 - pad_rem)
+
+          try:
+              ks_data = base64.b64decode(clean_b64)
+          except Exception as e:
+              print(f"::error::Failed to decode KEYSTORE_BASE64: {e}")
+              sys.exit(1)
+
+          if len(ks_data) < 500:
+              print(f"::error::Decoded keystore is suspiciously small ({len(ks_data)} bytes). Please verify the secret.")
+              sys.exit(1)
+
+          ks_path = os.path.abspath("app/tvfyy-player-release.jks")
+          with open(ks_path, "wb") as f:
+              f.write(ks_data)
+
+          print(f"Successfully reconstructed keystore at {ks_path} ({len(ks_data)} bytes).")
+
+          # Safe keytool verification if password provided
+          if store_pass:
+              kt = subprocess.run(["keytool", "-list", "-keystore", ks_path, "-storepass", store_pass], capture_output=True, text=True)
+              if kt.returncode != 0:
+                  print("::warning::Keytool password check failed with provided KEYSTORE_PASSWORD. Please verify secret.")
+              else:
+                  print("Keystore integrity and password verified successfully.")
+                  if key_alias and key_alias in kt.stdout:
+                      print(f"Verified alias '{key_alias}' exists in keystore.")
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"KEYSTORE_PATH={ks_path}\n")
+              f.write(f"STORE_PASSWORD={store_pass}\n")
+              f.write(f"KEY_ALIAS={key_alias}\n")
+              f.write(f"KEY_PASSWORD={key_pass}\n")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write("has_keystore=true\n")
+          EOF
 
       - name: Ensure Fallback Keystore Exists
         if: steps.prepare_keystore.outputs.has_keystore != 'true'
