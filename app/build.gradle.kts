@@ -38,28 +38,42 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH")
-      val storePasswordVal = System.getenv("STORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD")
-      val keyAliasVal = System.getenv("KEY_ALIAS") ?: "upload"
-      val keyPasswordVal = System.getenv("KEY_PASSWORD") ?: System.getenv("KEY_ALIAS_PASSWORD")
-      if (!keystorePath.isNullOrBlank() && file(keystorePath).exists()) {
-        storeFile = file(keystorePath)
-        storePassword = storePasswordVal
-        keyAlias = keyAliasVal
-        keyPassword = keyPasswordVal
+      val envKeystorePath = System.getenv("KEYSTORE_PATH")
+      val envStorePassword = System.getenv("STORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: "android"
+      val envKeyAlias = System.getenv("KEY_ALIAS") ?: System.getenv("KEY_ALIAS_NAME") ?: "androiddebugkey"
+      val envKeyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("KEY_ALIAS_PASSWORD") ?: "android"
+
+      val targetStoreFile = when {
+        !envKeystorePath.isNullOrBlank() && file(envKeystorePath).exists() -> file(envKeystorePath)
+        !envKeystorePath.isNullOrBlank() && rootProject.file(envKeystorePath).exists() -> rootProject.file(envKeystorePath)
+        file("release.keystore").exists() -> file("release.keystore")
+        file("release.jks").exists() -> file("release.jks")
+        rootProject.file("release.keystore").exists() -> rootProject.file("release.keystore")
+        rootProject.file("release.jks").exists() -> rootProject.file("release.jks")
+        rootProject.file("debug.keystore").exists() -> rootProject.file("debug.keystore")
+        file("debug.keystore").exists() -> file("debug.keystore")
+        else -> null
+      }
+
+      if (targetStoreFile != null) {
+        storeFile = targetStoreFile
+        storePassword = envStorePassword
+        keyAlias = envKeyAlias
+        keyPassword = envKeyPassword
+      }
+    }
+    create("debugConfig") {
+      val debugStore = if (rootProject.file("debug.keystore").exists()) {
+        rootProject.file("debug.keystore")
       } else {
-        // Fallback to local debug signing if no external release keystore is provided
-        storeFile = file("${rootDir}/debug.keystore")
+        file("debug.keystore")
+      }
+      if (debugStore.exists()) {
+        storeFile = debugStore
         storePassword = "android"
         keyAlias = "androiddebugkey"
         keyPassword = "android"
       }
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
     }
   }
 
