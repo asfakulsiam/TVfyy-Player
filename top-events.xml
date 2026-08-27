@@ -1,0 +1,34 @@
+[
+  {
+    "id": "event-1",
+    "title": "Live Match Event",
+    "description": "Watch the live match with multiple available servers.",
+    "image": "https://example.com/images/event-1.jpg",
+    "server": [
+      {
+        "server_namd": "Server 1",
+        "server_url": "https://example.com/server1"
+      },
+      {
+        "server_namd": "Server 2",
+        "server_url": "https://example.com/server2"
+      }
+    ]
+  },
+  {
+    "id": "event-2",
+    "title": "Upcoming Match Event",
+    "description": "Enjoy the upcoming match with multiple streaming options.",
+    "image": "https://example.com/images/event-2.jpg",
+    "server": [
+      {
+        "server_namd": "Server 1",
+        "server_url": "https://example.com/server1"
+      },
+      {
+        "server_namd": "Server 2",
+        "server_url": "https://example.com/server2"
+      }
+    ]
+  }
+]
