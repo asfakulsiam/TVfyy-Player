@@ -1,0 +1,6 @@
+{
+  "name": "TVfyy Player",
+  "description": "Production-grade native Android video player powered by Media3 ExoPlayer with advanced Subtitle & Multi-Audio System (online search, local SRT/VTT/ASS importer, audio & subtitle synchronization, volume boost, custom appearance, Bengali Unicode support), adaptive streaming (HLS/DASH), gesture controls, and custom HTTP headers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

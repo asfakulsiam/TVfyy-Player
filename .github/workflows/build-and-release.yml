@@ -1,0 +1,115 @@
+name: TVfyy Player CI/CD - Build & Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Publish a GitHub Release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    name: Build, Test & Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Prepare Signing Keystore
+        id: prepare_keystore
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Decoding release keystore from GitHub Secrets..."
+            mkdir -p ${{ github.workspace }}/keystore
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/keystore/release.jks
+            echo "KEYSTORE_PATH=${{ github.workspace }}/keystore/release.jks" >> $GITHUB_ENV
+            echo "STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+            echo "has_keystore=true" >> $GITHUB_OUTPUT
+          else
+            echo "No KEYSTORE_BASE64 secret found. Falling back to build configurations."
+            echo "has_keystore=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Grant Execute Permission for Gradle
+        run: chmod +x gradlew || true
+
+      - name: Run Unit & JVM Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Build Release APK & Bundle
+        run: ./gradlew assembleRelease bundleRelease --no-daemon
+
+      - name: Prepare Artifacts & Checksums
+        id: prepare_artifacts
+        run: |
+          VERSION="${GITHUB_REF_NAME:-v1.0.0}"
+          VERSION="${VERSION#v}"
+          mkdir -p release_dist
+
+          # Copy APK if generated
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk release_dist/TVfyy-Player-v${VERSION}.apk
+          elif [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            cp app/build/outputs/apk/release/app-release-unsigned.apk release_dist/TVfyy-Player-v${VERSION}-unsigned.apk
+          fi
+
+          # Copy AAB if generated
+          if [ -f app/build/outputs/bundle/release/app-release.aab ]; then
+            cp app/build/outputs/bundle/release/app-release.aab release_dist/TVfyy-Player-v${VERSION}.aab
+          fi
+
+          # Generate SHA256 checksums
+          cd release_dist
+          sha256sum * > SHA256SUMS.txt || true
+          cd ..
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: TVfyy-Player-Build-Artifacts
+          path: release_dist/
+          retention-days: 14
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release_dist/*.apk
+            release_dist/*.aab
+            release_dist/SHA256SUMS.txt
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

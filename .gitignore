@@ -1,0 +1,40 @@
+# Built application files
+*.apk
+*.aar
+*.aab
+*.dex
+.build-outputs/
+
+# Gradle files
+.gradle/
+build/
+**/build/
+
+# Kotlin / IDE
+.kotlin/
+*.iml
+.idea/
+.vscode/
+
+# Local configuration
+local.properties
+.env
+.env.local
+
+# Keystores & Signing
+debug.keystore
+debug.keystore.base64
+*.jks
+*.keystore
+
+# Android Studio / OS files
+/captures/
+.externalNativeBuild/
+.cxx/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+*.swp
+

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Antenna Left Ball -->
+    <path
+        android:pathData="M 75 42 A 6 6 0 1 1 75 41.99 Z"
+        android:fillColor="#E040FB" />
+
+    <!-- Antenna Left Stalk -->
+    <path
+        android:pathData="M 75 42 L 90 64"
+        android:strokeWidth="4.5"
+        android:strokeColor="#E040FB"
+        android:strokeLineCap="round" />
+
+    <!-- Antenna Right Ball -->
+    <path
+        android:pathData="M 125 42 A 6 6 0 1 1 125 41.99 Z"
+        android:fillColor="#A855F7" />
+
+    <!-- Antenna Right Stalk -->
+    <path
+        android:pathData="M 125 42 L 110 64"
+        android:strokeWidth="4.5"
+        android:strokeColor="#A855F7"
+        android:strokeLineCap="round" />
+
+    <!-- Outer TV Pebble with Smooth Bevel Gradient -->
+    <path
+        android:pathData="M 60 64 C 44 64 36 80 42 104 C 47 130 64 144 94 144 C 135 144 162 128 162 100 C 162 74 130 64 100 64 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="38"
+                android:startY="60"
+                android:endX="164"
+                android:endY="144"
+                android:type="linear">
+                <item android:color="#F43F5E" android:offset="0.0" />
+                <item android:color="#D946EF" android:offset="0.3" />
+                <item android:color="#8B5CF6" android:offset="0.7" />
+                <item android:color="#6D28D9" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner Dark Screen Void -->
+    <path
+        android:pathData="M 66 76 C 55 76 49 87 53 102 C 57 119 68 130 90 130 C 121 130 146 117 146 100 C 146 82 120 76 96 76 Z"
+        android:fillColor="#150E28" />
+
+    <!-- Pure White Central Rounded Play Button -->
+    <path
+        android:pathData="M 88 84 C 86.2 83.1 84 84.4 84 86.5 L 84 113.5 C 84 115.6 86.2 116.9 88 115.9 L 114 102.4 C 115.8 101.4 115.8 98.6 114 97.6 Z"
+        android:fillColor="#FFFFFF" />
+
+</vector>
