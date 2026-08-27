@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.local.TvFyyDatabase
 import com.example.data.parser.M3uExportOptions
 import com.example.data.repository.PlaylistRepository
+import com.example.data.repository.TopEventsRepository
 import com.example.domain.model.ChannelSortOrder
 import com.example.domain.model.ImportMode
 import com.example.domain.model.MediaItemData
@@ -18,6 +19,7 @@ import com.example.domain.model.PlaylistChangeSummary
 import com.example.domain.model.PlaylistChannel
 import com.example.domain.model.PlaylistSourceType
 import com.example.domain.model.StreamType
+import com.example.domain.model.TopEvent
 import com.example.resolver.MediaTypeDetector
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -57,9 +59,82 @@ data class ImportUiState(
 class PlaylistViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = PlaylistRepository(TvFyyDatabase.getDatabase(application))
+    private val topEventsRepository = TopEventsRepository(application)
+
+    val topEvents: StateFlow<List<TopEvent>> = topEventsRepository.topEvents
+    val isTopEventsLoading: StateFlow<Boolean> = topEventsRepository.isLoading
 
     val playlists: StateFlow<List<Playlist>> = repository.allPlaylists
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _isDefaultUpdateAvailable = MutableStateFlow(false)
+    val isDefaultUpdateAvailable: StateFlow<Boolean> = _isDefaultUpdateAvailable.asStateFlow()
+
+    private val _showSyncConfirmModal = MutableStateFlow(false)
+    val showSyncConfirmModal: StateFlow<Boolean> = _showSyncConfirmModal.asStateFlow()
+
+    init {
+        initializeData()
+    }
+
+    private fun initializeData() {
+        viewModelScope.launch {
+            try {
+                topEventsRepository.loadTopEvents()
+            } catch (_: Exception) {}
+
+            try {
+                val defaultId = repository.ensureDefaultPlaylistInitialized(getApplication())
+                if (_selectedPlaylistId.value == null && defaultId > 0) {
+                    _selectedPlaylistId.value = defaultId
+                }
+                checkDefaultPlaylistUpdate()
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun checkDefaultPlaylistUpdate() {
+        viewModelScope.launch {
+            try {
+                val hasUpdate = repository.checkForDefaultPlaylistUpdate()
+                _isDefaultUpdateAvailable.value = hasUpdate
+            } catch (_: Exception) {
+                _isDefaultUpdateAvailable.value = false
+            }
+        }
+    }
+
+    fun openSyncConfirmModal() {
+        _showSyncConfirmModal.value = true
+    }
+
+    fun dismissSyncConfirmModal() {
+        _showSyncConfirmModal.value = false
+    }
+
+    fun confirmSyncDefaultPlaylist() {
+        _showSyncConfirmModal.value = false
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            val result = repository.syncDefaultPlaylist(getApplication())
+            _isRefreshing.value = false
+            result.fold(
+                onSuccess = { count ->
+                    _isDefaultUpdateAvailable.value = false
+                    _userMessage.emit("Playlist synced with GitHub successfully ($count channels).")
+                },
+                onFailure = { err ->
+                    _userMessage.emit("Sync failed: ${err.message}")
+                }
+            )
+        }
+    }
+
+    fun refreshTopEvents() {
+        viewModelScope.launch {
+            topEventsRepository.loadTopEvents()
+        }
+    }
 
     // Active Playlist Detail State
     private val _selectedPlaylistId = MutableStateFlow<Long?>(null)
@@ -154,6 +229,19 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             ChannelSortOrder.RECENTLY_ADDED -> list.sortedByDescending { it.createdAt }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val channels: StateFlow<List<PlaylistChannel>> = displayedChannels
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun toggleFavorite(channelId: Long) {
+        viewModelScope.launch {
+            val current = rawChannels.value.firstOrNull { it.id == channelId } ?: return@launch
+            repository.toggleFavorite(channelId, !current.isFavorite)
+        }
+    }
 
     fun selectPlaylist(id: Long?) {
         _selectedPlaylistId.value = id

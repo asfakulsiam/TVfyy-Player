@@ -170,7 +170,7 @@ fun VideoPlayerScreen(
             onAdjustVerticalOffset = { viewModel.adjustSubtitleVerticalOffset(it) }
         )
 
-        // Gesture Touch Input Overlay Layer (only active when not in PiP)
+        // Gesture Touch Input Overlay Layer (active when not in PiP)
         if (!uiState.isInPipMode) {
             Box(
                 modifier = Modifier
@@ -182,7 +182,7 @@ fun VideoPlayerScreen(
                             }
                         }
                     }
-                    .pointerInput(uiState.isControlsLocked) {
+                    .pointerInput(uiState.isControlsLocked, uiState.showControls) {
                         detectTapGestures(
                             onTap = {
                                 viewModel.toggleControls()
@@ -204,8 +204,9 @@ fun VideoPlayerScreen(
                             }
                         )
                     }
-                    .pointerInput(uiState.isControlsLocked) {
-                        if (uiState.isControlsLocked) return@pointerInput
+                    .pointerInput(uiState.isControlsLocked, uiState.showControls) {
+                        // Only enable fullscreen swipe gestures when controls are hidden
+                        if (uiState.isControlsLocked || uiState.showControls) return@pointerInput
                         var totalDragX = 0f
                         var totalDragY = 0f
                         var isLeftHalf = false

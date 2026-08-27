@@ -4,6 +4,22 @@ All notable changes to the **TVfyy Player** project are documented in this file.
 
 ---
 
+## [1.1.5] - 2026-08-27
+
+### Added
+- **Top Events Live Carousel & Multi-Server Selector**: Added live sports and special broadcast events carousel on the Home dashboard with multi-server stream switching modal (`EventServerSheet`), auto-fetching from GitHub (`top-events.xml`) with local asset fallback.
+- **Automated GitHub Playlist Sync & Change Detection**: Default `playlist.m3u` is automatically initialized from GitHub with version tracking. When updates are detected on GitHub, a prominent sync badge appears on the Home header.
+- **Sync Confirmation & Favorite Reset Warning Dialog**: Created `SyncPlaylistDialog` informing users that syncing will refresh the channel database and reset old favorite markers.
+- **Bento Quick Actions Grid**: Added 4 quick action cards on Home (Local File, Direct URL Stream, Playlists Hub, Starred Favorites).
+- **Categorized Live Channels Explorer**: Integrated real-time live channel browsing by genre (Sports, News, Bangla, Hindi, English, Kids, etc.) with instant search filtering, channel logos, live indicators, and favorite toggles.
+
+### Fixed
+- **Status Bar & System Navigation Bar Overlap**: Applied edge-to-edge `statusBarsPadding()` and `navigationBarsPadding()` across all player overlay controls, floating unlock buttons, top header bars, and destination screens.
+- **Gesture Conflict on Active Video Player**: Resolved touch event consumption between playback swipe gestures (brightness/volume/seek) and interactive player controls.
+- **Navigation Bar Ergonomics**: Streamlined bottom navigation bar to 4 clean primary tabs (Home, Playlists, Stream, Settings), moving advanced settings to the Settings hub.
+
+---
+
 ## [1.1.4] - 2026-08-27
 
 ### Added

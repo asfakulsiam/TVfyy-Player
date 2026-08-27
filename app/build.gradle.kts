@@ -15,12 +15,12 @@ android {
 
   val gitRefName = System.getenv("GITHUB_REF_NAME") ?: ""
   val cleanTag = if (gitRefName.startsWith("v")) gitRefName.removePrefix("v") else gitRefName
-  val computedVersionName = if (cleanTag.isNotBlank() && cleanTag.matches(Regex("\\d+\\.\\d+.*"))) cleanTag else "1.1.4"
+  val computedVersionName = if (cleanTag.isNotBlank() && cleanTag.matches(Regex("\\d+\\.\\d+.*"))) cleanTag else "1.1.5"
   val computedVersionCode = try {
     val parts = computedVersionName.split(".").mapNotNull { it.takeWhile { c -> c.isDigit() }.toIntOrNull() }
     val major = parts.getOrElse(0) { 1 }
     val minor = parts.getOrElse(1) { 1 }
-    val patch = parts.getOrElse(2) { 4 }
+    val patch = parts.getOrElse(2) { 5 }
     (major * 10000) + (minor * 100) + patch
   } catch (_: Exception) {
     1

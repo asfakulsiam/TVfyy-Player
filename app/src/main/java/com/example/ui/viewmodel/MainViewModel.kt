@@ -243,6 +243,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun playStream(url: String, title: String, streamType: StreamType = StreamType.HLS) {
+        viewModelScope.launch {
+            val mediaItemData = MediaItemData(
+                uri = url,
+                title = title,
+                streamType = streamType,
+                headers = emptyMap(),
+                isLocalFile = url.startsWith("content://") || url.startsWith("file://")
+            )
+            _navigateToPlayer.emit(mediaItemData)
+        }
+    }
+
     fun deleteFavorite(id: Long) {
         viewModelScope.launch {
             repository.deleteFavorite(id)

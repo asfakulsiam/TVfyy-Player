@@ -809,6 +809,176 @@ class PlaylistRepository(private val database: TvFyyDatabase) {
         }
     }
 
+    companion object {
+        const val DEFAULT_PLAYLIST_NAME = "TVfyy Live"
+        const val DEFAULT_PLAYLIST_GITHUB_URL = "https://raw.githubusercontent.com/asfakulsiam/TVfyy-Player/main/playlist.m3u"
+    }
+
+    suspend fun getDefaultPlaylist(): PlaylistEntity? = withContext(Dispatchers.IO) {
+        val all = playlistDao.getAllPlaylists()
+        all.firstOrNull { it.sourceUrl == DEFAULT_PLAYLIST_GITHUB_URL || it.name == DEFAULT_PLAYLIST_NAME }
+            ?: all.firstOrNull { it.isActive }
+            ?: all.firstOrNull()
+    }
+
+    suspend fun ensureDefaultPlaylistInitialized(context: Context): Long = withContext(Dispatchers.IO) {
+        val existing = getDefaultPlaylist()
+        if (existing != null) {
+            val count = channelDao.getAllChannelsForPlaylist(existing.id).size
+            if (count > 0) {
+                return@withContext existing.id
+            }
+        }
+
+        // Parse from remote or fallback asset
+        var parsed: ParsedPlaylist? = null
+        val remoteResult = downloadAndParseUrl(DEFAULT_PLAYLIST_GITHUB_URL, DEFAULT_PLAYLIST_NAME)
+        if (remoteResult.isSuccess) {
+            parsed = remoteResult.getOrNull()
+        }
+
+        if (parsed == null || parsed.entries.isEmpty()) {
+            try {
+                val assetStream = context.assets.open("playlist.m3u")
+                parsed = assetStream.use { M3uParser.parse(it, DEFAULT_PLAYLIST_NAME) }
+            } catch (_: Exception) {}
+        }
+
+        if (parsed != null && parsed.entries.isNotEmpty()) {
+            val targetId = existing?.id
+            val mode = if (targetId != null) ImportMode.REPLACE_EXISTING else ImportMode.ADD_AS_NEW
+            val importResult = importParsedPlaylist(
+                parsed = parsed,
+                playlistName = DEFAULT_PLAYLIST_NAME,
+                sourceType = PlaylistSourceType.GITHUB_RAW,
+                sourceUrl = DEFAULT_PLAYLIST_GITHUB_URL,
+                mode = mode,
+                targetPlaylistId = targetId
+            )
+            val newId = importResult.getOrDefault(targetId ?: 1L)
+            playlistDao.setActivePlaylist(newId)
+            newId
+        } else {
+            existing?.id ?: 0L
+        }
+    }
+
+    suspend fun checkForDefaultPlaylistUpdate(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val defaultPlaylist = getDefaultPlaylist() ?: return@withContext false
+            val remoteResult = downloadAndParseUrl(DEFAULT_PLAYLIST_GITHUB_URL, DEFAULT_PLAYLIST_NAME)
+            if (remoteResult.isFailure) return@withContext false
+
+            val remoteParsed = remoteResult.getOrThrow()
+            val existingChannels = channelDao.getAllChannelsForPlaylist(defaultPlaylist.id)
+
+            if (existingChannels.size != remoteParsed.entries.size) return@withContext true
+
+            val existingMap = existingChannels.associateBy {
+                buildChannelMatchingKey(it.tvgId, it.streamUrl, it.name, it.categoryName)
+            }
+
+            for (entry in remoteParsed.entries) {
+                val groupTitle = entry.groupTitle?.ifBlank { "Uncategorized" } ?: "Uncategorized"
+                val key = buildChannelMatchingKey(entry.tvgId, entry.streamUrl, entry.name, groupTitle)
+                val existing = existingMap[key]
+                if (existing == null || existing.streamUrl != entry.streamUrl || existing.name != entry.name) {
+                    return@withContext true
+                }
+            }
+            false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    suspend fun syncDefaultPlaylist(context: Context): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            val defaultPlaylist = getDefaultPlaylist()
+            var parsed: ParsedPlaylist? = null
+
+            val remoteResult = downloadAndParseUrl(DEFAULT_PLAYLIST_GITHUB_URL, DEFAULT_PLAYLIST_NAME)
+            if (remoteResult.isSuccess) {
+                parsed = remoteResult.getOrNull()
+            }
+
+            if (parsed == null || parsed.entries.isEmpty()) {
+                try {
+                    val assetStream = context.assets.open("playlist.m3u")
+                    parsed = assetStream.use { M3uParser.parse(it, DEFAULT_PLAYLIST_NAME) }
+                } catch (_: Exception) {}
+            }
+
+            if (parsed == null || parsed.entries.isEmpty()) {
+                return@withContext Result.failure(Exception("Could not fetch latest playlist from GitHub or asset."))
+            }
+
+            val targetId: Long
+            if (defaultPlaylist != null) {
+                targetId = defaultPlaylist.id
+                // As per user requirement: clear old favorites permanently and update all channels
+                channelDao.deleteAllChannelsForPlaylist(targetId)
+                categoryDao.deleteAllCategoriesForPlaylist(targetId)
+                playlistDao.renamePlaylist(targetId, DEFAULT_PLAYLIST_NAME, System.currentTimeMillis())
+            } else {
+                val newPl = PlaylistEntity(
+                    name = DEFAULT_PLAYLIST_NAME,
+                    sourceType = PlaylistSourceType.GITHUB_RAW.name,
+                    sourceUrl = DEFAULT_PLAYLIST_GITHUB_URL,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis(),
+                    lastSyncedAt = System.currentTimeMillis(),
+                    isActive = true
+                )
+                targetId = playlistDao.insertPlaylist(newPl)
+            }
+
+            val now = System.currentTimeMillis()
+            val uniqueCategories = parsed.categories.ifEmpty { listOf("Uncategorized") }
+            val categoryEntities = uniqueCategories.mapIndexed { index, catName ->
+                CategoryEntity(
+                    playlistId = targetId,
+                    name = catName,
+                    position = index,
+                    isVisible = true
+                )
+            }
+            categoryDao.insertCategories(categoryEntities)
+            val categoryMap = categoryDao.getCategoriesForPlaylist(targetId).associate { it.name to it.id }
+
+            val channelEntities = parsed.entries.mapIndexed { index, entry ->
+                val catName = entry.groupTitle?.ifBlank { "Uncategorized" } ?: "Uncategorized"
+                ChannelEntity(
+                    playlistId = targetId,
+                    categoryId = categoryMap[catName],
+                    categoryName = catName,
+                    name = entry.name,
+                    tvgId = entry.tvgId,
+                    tvgName = entry.tvgName,
+                    tvgLogo = entry.tvgLogo,
+                    streamUrl = entry.streamUrl,
+                    position = index,
+                    isFavorite = false,
+                    isUserEdited = false,
+                    knownAttributes = entry.knownAttributes,
+                    unknownAttributes = entry.unknownAttributes,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            }
+
+            channelEntities.chunked(500).forEach { chunk ->
+                channelDao.insertChannels(chunk)
+            }
+
+            playlistDao.updateLastSynced(targetId, now, now)
+            playlistDao.setActivePlaylist(targetId)
+            Result.success(channelEntities.size)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private fun PlaylistWithCounts.toDomain(): Playlist {
         return Playlist(
             id = id,

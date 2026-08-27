@@ -5,13 +5,15 @@ import androidx.compose.ui.graphics.Color
 // Cinematic TVfyy Palette
 val CyanPrimary = Color(0xFF00E5FF)
 val CyanPrimaryDark = Color(0xFF00B4D8)
+val CyanGlow = Color(0x3300E5FF)
 val IndigoSecondary = Color(0xFF818CF8)
 val PurpleTertiary = Color(0xFFA855F7)
 
-val DarkBackground = Color(0xFF0B0F19)
-val DarkSurface = Color(0xFF131B2E)
-val DarkSurfaceVariant = Color(0xFF1E293B)
-val DarkSurfaceHighlight = Color(0xFF2A374F)
+val DarkBackground = Color(0xFF0B1326)
+val DarkSurface = Color(0xFF131D33)
+val DarkSurfaceVariant = Color(0xFF1B2844)
+val DarkSurfaceHighlight = Color(0xFF243455)
+val DarkSurfaceElevated = Color(0xFF2D3E63)
 
 val LightBackground = Color(0xFFF8FAFC)
 val LightSurface = Color(0xFFFFFFFF)

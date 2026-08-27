@@ -245,10 +245,12 @@ fun AppNavigation(
                 } else {
                     when (currentTab) {
                         NavItem.Home -> HomeScreen(
-                            viewModel = mainViewModel,
+                            mainViewModel = mainViewModel,
+                            playlistViewModel = playlistViewModel,
                             onNavigateToUrl = { currentTab = NavItem.Url },
                             onNavigateToPlaylists = { currentTab = NavItem.Playlists },
                             onNavigateToFavorites = { currentTab = NavItem.Favorites },
+                            onNavigateToHistory = { currentTab = NavItem.History },
                             onNavigateToSupport = { isSupportOpen = true },
                             onCheckForUpdates = { updateViewModel.checkForUpdates(isUserInitiated = true) },
                             availableUpdate = updateState.updateInfo
