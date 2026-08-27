@@ -59,8 +59,20 @@ jobs:
             echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
             echo "has_keystore=true" >> $GITHUB_OUTPUT
           else
-            echo "No KEYSTORE_BASE64 secret found. Falling back to build configurations."
+            echo "No KEYSTORE_BASE64 secret found. Falling back to debug keystore for CI verification."
             echo "has_keystore=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Ensure Fallback Keystore Exists
+        if: steps.prepare_keystore.outputs.has_keystore != 'true'
+        run: |
+          if [ ! -f "${{ github.workspace }}/debug.keystore" ]; then
+            echo "Generating fallback debug keystore for CI runner..."
+            keytool -genkeypair -v -storetype PKCS12 \
+              -keystore ${{ github.workspace }}/debug.keystore -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
           fi
 
       - name: Grant Execute Permission for Gradle

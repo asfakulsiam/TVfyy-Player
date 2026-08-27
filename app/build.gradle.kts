@@ -11,14 +11,27 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 36
+
+  val gitRefName = System.getenv("GITHUB_REF_NAME") ?: ""
+  val cleanTag = if (gitRefName.startsWith("v")) gitRefName.removePrefix("v") else gitRefName
+  val computedVersionName = if (cleanTag.isNotBlank() && cleanTag.matches(Regex("\\d+\\.\\d+.*"))) cleanTag else "1.1.0"
+  val computedVersionCode = try {
+    val parts = computedVersionName.split(".").mapNotNull { it.takeWhile { c -> c.isDigit() }.toIntOrNull() }
+    val major = parts.getOrElse(0) { 1 }
+    val minor = parts.getOrElse(1) { 1 }
+    val patch = parts.getOrElse(2) { 0 }
+    (major * 10000) + (minor * 100) + patch
+  } catch (_: Exception) {
+    1
+  }
 
   defaultConfig {
     applicationId = "com.aistudio.tvfyyplayer.app"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = computedVersionCode
+    versionName = computedVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
