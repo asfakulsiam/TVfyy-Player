@@ -42,6 +42,9 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: wrapper
+          cache-disabled: false
 
       - name: Prepare Signing Keystore
         id: prepare_keystore
@@ -92,6 +95,23 @@ jobs:
           cd release_dist
           sha256sum * > SHA256SUMS.txt || true
           cd ..
+
+          # Write GitHub Step Summary
+          echo "## 🚀 TVfyy Player Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | File Size |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          for file in release_dist/*; do
+            if [ -f "$file" ]; then
+              fname=$(basename "$file")
+              fsize=$(ls -lh "$file" | awk '{print $5}')
+              echo "| \`$fname\` | $fsize |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔑 SHA256 Checksums" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat release_dist/SHA256SUMS.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
