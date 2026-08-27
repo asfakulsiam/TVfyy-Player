@@ -4,6 +4,18 @@ All notable changes to the **TVfyy Player** project are documented in this file.
 
 ---
 
+## [1.1.4] - 2026-08-27
+
+### Added
+- **In-App Downloader Modal**: Replaced external browser redirection with an internal background downloader modal that streams the update APK directly inside the app.
+- **Live Download Progress & Telemetry**: Displays real-time download progress with an animated linear progress bar, byte indicators (e.g. `8.2 MB / 17.5 MB`), percentage, and live download speed (e.g. `2.8 MB/s`).
+- **Immediate In-App APK Installation**: Once the download completes, the modal transitions to the installation screen featuring prominent **"Install Now"** and **"Cancel"** action buttons.
+- **Unknown Sources Permission Flow**: Integrated detection for Android 8.0+ `REQUEST_INSTALL_PACKAGES` permission (`canRequestPackageInstalls()`). If permission is required, displays an informative prompt with a direct shortcut to open Android's "Install unknown apps" settings.
+- **FileProvider Integration**: Configured secure `FileProvider` authorities (`${applicationId}.fileprovider`) and `file_paths.xml` for package installer intent dispatching.
+- **Download Resilience & Browser Fallback**: Added cancel, retry, and secondary "Download via Browser" fallback capabilities in case of connectivity errors.
+
+---
+
 ## [1.1.3] - 2026-08-27
 
 ### Fixed

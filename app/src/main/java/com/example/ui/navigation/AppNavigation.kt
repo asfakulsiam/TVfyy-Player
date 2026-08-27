@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +61,7 @@ import com.example.ui.support.BuyMeACoffeeScreen
 import com.example.ui.theme.CyanPrimary
 import com.example.ui.url.UrlStreamScreen
 import com.example.ui.splash.SplashScreen
+import com.example.ui.update.DownloadProgressDialog
 import com.example.ui.update.UpdateDialog
 import com.example.ui.viewmodel.MainViewModel
 import com.example.ui.viewmodel.PlayerViewModel
@@ -94,11 +96,15 @@ fun AppNavigation(
     var activeMediaItem by remember { mutableStateOf<MediaItemData?>(null) }
     var openedPlaylistId by remember { mutableStateOf<Long?>(null) }
     var isSupportOpen by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val playerUiState by playerViewModel.uiState.collectAsStateWithLifecycle()
     val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
     val updateState by updateViewModel.updateState.collectAsStateWithLifecycle()
     val showUpdateDialog by updateViewModel.showUpdateDialog.collectAsStateWithLifecycle()
+    val showDownloadModal by updateViewModel.showDownloadModal.collectAsStateWithLifecycle()
+    val downloadState by updateViewModel.downloadState.collectAsStateWithLifecycle()
+    val activeUpdateInfo by updateViewModel.activeUpdateInfo.collectAsStateWithLifecycle()
 
     if (isSplashVisible) {
         SplashScreen(
@@ -137,9 +143,29 @@ fun AppNavigation(
         val currentUpdate = updateState.updateInfo!!
         UpdateDialog(
             updateInfo = currentUpdate,
-            onDownloadNow = { updateViewModel.onDownloadNow(currentUpdate) },
+            onDownloadNow = { updateViewModel.startInAppDownload(currentUpdate) },
             onRemindLater = { updateViewModel.onRemindLater(currentUpdate) },
             onDismiss = { updateViewModel.dismissDialog() }
+        )
+    }
+
+    if (showDownloadModal && activeUpdateInfo != null) {
+        val targetUpdate = activeUpdateInfo!!
+        DownloadProgressDialog(
+            updateInfo = targetUpdate,
+            downloadState = downloadState,
+            onInstall = { apkFile ->
+                updateViewModel.installApk(context, apkFile)
+            },
+            onCancel = {
+                updateViewModel.dismissDownloadModal()
+            },
+            onRetry = {
+                updateViewModel.retryDownload(targetUpdate)
+            },
+            onOpenBrowser = {
+                updateViewModel.openBrowserFallback(targetUpdate)
+            }
         )
     }
 
